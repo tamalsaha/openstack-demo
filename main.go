@@ -31,12 +31,17 @@ func main()  {
 	if err != nil {
 		fmt.Println(err)
 	}
-	//getflavorlist(client)
-	getServerList(client)
-	getSSHKey(client)
-	getimagelist(client)
+	getflavorlist(client)
+	//createNetwork(client)
+	//getNetworkList(client)
+	//getServerList(client)
+	/*getflavorlist(client)
 	getNetworkList(client)
-	createServer(client)
+	getServerList(client)*/
+	/*getSSHKey(client)
+	getimagelist(client)
+
+	createServer(client)*/
 
 }
 
@@ -59,8 +64,9 @@ func getimagelist(client *gophercloud.ServiceClient)  error {
 
 
 func getflavorlist(client *gophercloud.ServiceClient)  error {
-	opts := flavors.ListOpts{ChangesSince: "2014-01-01T01:02:03Z", MinRAM: 1}
+	opts := flavors.ListOpts{ChangesSince: "2014-01-01T01:02:03Z"}
 	pager := flavors.ListDetail(client, opts)
+
 	return  pager.EachPage(func(page pagination.Page) (bool, error) {
 		flavorList, err := flavors.ExtractFlavors(page)
 		if err != nil {
@@ -68,11 +74,16 @@ func getflavorlist(client *gophercloud.ServiceClient)  error {
 		}
 
 		for _, f := range flavorList {
+			fmt.Println(f)
 			// "f" will be a flavors.Flavor
-			fmt.Println(f.Name, "<-->", f.ID)
+			fmt.Println(f.Name, "<-->", f.ID, f.RAM)
 		}
 		return true, nil
 	})
+}
+
+func getServerAddresses(client *gophercloud.ServiceClient)  {
+
 }
 
 func getServerList(client *gophercloud.ServiceClient)  {
@@ -83,11 +94,32 @@ func getServerList(client *gophercloud.ServiceClient)  {
 		serverList, err := servers.ExtractServers(page)
 		fmt.Println(err)
 		for _, s := range serverList {
-			fmt.Println(s.KeyName)
+			fmt.Println(s.KeyName, s.Addresses, s.Status, s.AccessIPv4)
+			fmt.Println(s.SecurityGroups)
+			servers.ListAddresses(client, s.ID).EachPage(func(page pagination.Page) (bool, error) {
+				as, err := servers.ExtractAddresses(page)
+				fmt.Println(err, as)
+				for b, a := range as {
+					fmt.Println(b, a[0].Address, "<><><>")
+				}
+				return true, nil
+
+			})
 		}
 		return true, nil
 	})
 	fmt.Println(err)
+}
+
+func createNetwork(client *gophercloud.ServiceClient) {
+	tr := true
+	net, err :=networks.Create(client, networks.CreateOpts{
+		Name: "testnetwork",
+		AdminStateUp: &tr,
+	//	Shared: &tr,
+		//TenantID: os.Getenv("OS_TENANT_ID"),
+	}).Extract()
+	fmt.Println(err, net.Status)
 }
 
 func getNetworkList(client *gophercloud.ServiceClient)  {
@@ -103,7 +135,7 @@ func getNetworkList(client *gophercloud.ServiceClient)  {
 		fmt.Println(err)
 		for _, n := range networkList {
 			// "n" will be a networks.Network
-			fmt.Println(n.Name, n.ID)
+			fmt.Println(n.Name, n.ID, n.Status)
 		}
 		return true, nil
 	})
@@ -111,7 +143,6 @@ func getNetworkList(client *gophercloud.ServiceClient)  {
 }
 
 func createServer(client *gophercloud.ServiceClient)  {
-	
 	opts := servers.CreateOpts{
 		Name:      "testovhserver",
 		ImageRef:  "2e962277-13ad-44f1-9b0d-56e6b0ef1c00",
@@ -170,3 +201,11 @@ func getOpenstacComputeClient() (*gophercloud.ServiceClient, error)  {
 	})
 }
 
+func getOpenstackNetworkClient() (*gophercloud.ServiceClient, error)  {
+	provider, err := openstack.AuthenticatedClient(getAuth())
+	fmt.Println(err)
+	return openstack.NewNetworkV2(provider, gophercloud.EndpointOpts{
+		Name: "neutron",
+		Region: os.Getenv("OS_REGION_NAME"),
+	})
+}
