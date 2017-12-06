@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/mitchellh/mapstructure"
 
 )
 
@@ -31,7 +32,9 @@ func main()  {
 	if err != nil {
 		fmt.Println(err)
 	}
-	getflavorlist(client)
+	//createPublicNetwork(client)
+	getServerAddresses(client)
+	//getflavorlist(client)
 	//createNetwork(client)
 	//getNetworkList(client)
 	//getServerList(client)
@@ -83,7 +86,24 @@ func getflavorlist(client *gophercloud.ServiceClient)  error {
 }
 
 func getServerAddresses(client *gophercloud.ServiceClient)  {
-
+	server, err := servers.Get(client, "cbc97bf5-b8bd-4850-9f95-172af4077cde").Extract()
+	fmt.Println(err)
+	type Address struct {
+		IpType string `mapstructure:"OS-EXT-IPS:type"`
+		Addr   string
+	}
+	var addresses map[string][]Address
+	err = mapstructure.Decode(server.Addresses, &addresses)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(server.AccessIPv4)
+	for network, addrList := range addresses {
+		for _, props := range addrList {
+			fmt.Println(props.IpType, props.Addr)
+		}
+		fmt.Println(network)
+	}
 }
 
 func getServerList(client *gophercloud.ServiceClient)  {
@@ -139,6 +159,13 @@ func getNetworkList(client *gophercloud.ServiceClient)  {
 		}
 		return true, nil
 	})
+	fmt.Println(err)
+}
+
+func createPublicNetwork(client *gophercloud.ServiceClient) {
+	iTrue := true
+	options := networks.CreateOpts{Name: "public", AdminStateUp: &iTrue, Shared: &iTrue, TenantID: "41b18bcc3f0e460ba97b19e5b6912247"}
+	_, err := networks.Create(client, options).Extract()
 	fmt.Println(err)
 }
 
